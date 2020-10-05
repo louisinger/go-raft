@@ -2,7 +2,7 @@ package main
 
 import (
 	"os"
-	"strings"
+	"log"
 	"github.com/louisinger/go-raft/internal"
 )
 
@@ -12,10 +12,14 @@ func main ()  {
 	peers := args[1:]
 
 	network := make(internal.Network, len(peers))
-	for index, peer := range peers {
-		s:= strings.Split(peer, ":")
-		peerNode := internal.NewNode(s[0], s[1], nil)
-		network[index] = *peerNode
+	for index, path := range peers {
+		peerClient, err := internal.NewClient(path)
+		if (err != nil) {
+			log.Println("Can't connect to", path, "| error:", err)
+		} else {
+			network[index] = *peerClient 
+			log.Println("Connection established with", path)
+		}
 	}
 	
 	node := internal.NewNode("localhost", port, network)

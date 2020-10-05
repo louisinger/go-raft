@@ -17,7 +17,7 @@ type Node struct {
 	log []string
 }
 
-type Network []Node
+type Network []Client
 
 // factory function for Node structure.
 func NewNode(dom string, port string, net Network) *Node {
@@ -30,9 +30,23 @@ func NewNode(dom string, port string, net Network) *Node {
 }
 
 // create an RPC Server from a node.
-func (n Node) RPCserver() *RPCServer {
-	return &RPCServer{
+func (n Node) RPCserver() *Server {
+	return &Server{
 		Node: n,
+	}
+}
+
+func (n Node) Path() string {
+	return n.Domain + ":" + n.Port
+}
+
+func (n *Node) AddPeer(path string) error {
+	peerClient, err := NewClient(path)
+	if (err != nil) {
+		return err
+	} else {
+		n.network = append(n.network, *peerClient)
+		return nil
 	}
 }
 
