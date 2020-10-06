@@ -10,27 +10,34 @@ type Store map[string][]byte
 
 type Command interface {
 	apply(state Store) error
+	getTerm() int
+}
+
+type Entry struct {
+	term int
 }
 
 // The command put inserts (or replaces) a value at a given key
 type Put struct {
-	term int
+	Entry
 	key string
 	value Json
 }
 
 // The command delete removes a key from the given state.
 type Delete struct {
-	term int
+	Entry
 	key string
 }
 
+func (e Entry) getTerm() int {
+	return e.term
+}
+
 // apply a list of commands (= a log)
-func (state Store) Apply(log ...Command) error {
-	for _, command := range log {
-		if err := command.apply(state); err != nil {
-			return err
-		}
+func (state Store) Apply(cmd Command) error {
+	if err := cmd.apply(state); err != nil {
+		return err
 	}
 	return nil
 }
@@ -50,6 +57,7 @@ func (state Store) Get(key string) (Json, error) {
 
 	return jsonResult, nil
 }
+
 
 // implements apply function for PUT and DELETE
 

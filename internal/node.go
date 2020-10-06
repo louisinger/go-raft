@@ -14,6 +14,7 @@ type Node struct {
 	Domain string
 	Port string
 	Status status
+	currentTerm int
 	network Network
 	stateMachine StateMachine
 }

@@ -56,21 +56,41 @@ func (server *Server) NewPeer(path string, reply *bool) error {
 }
 
 type AppendEntriesArgs struct {
-	Term int
-	LeaderId string
-	PrevLogIndex int
-	PrevLogTerm int
-	Entries []Command
-	LeaderCommit int
+	term int
+	leaderId string
+	prevLogIndex int
+	prevLogTerm int
+	entries []Command
+	leaderCommit int
 }
 
 type AppendEntriesReply struct {
-	Term int
-	Success bool
+	term int
+	success bool
 }
 
 // RPC method AppendEntries
 func (server *Server) AppendEntries(payload AppendEntriesArgs, reply *AppendEntriesReply) error {
+	reply.term = server.Node.currentTerm 
+	if (payload.term < server.Node.currentTerm) {
+		reply.success = false
+		return nil
+	}
 	
+	containLogAtPrevIndex := len(server.Node.stateMachine.log) - 1 > payload.prevLogIndex
+	if (containLogAtPrevIndex && payload.prevLogTerm != server.Node.stateMachine.log[payload.prevLogIndex].getTerm()) {
+		reply.success = false
+		return nil
+	}
+	// remove the potential conflicted entries
+	server.Node.stateMachine.removeIfConflicts(payload.entries, payload.prevLogIndex + 1)
+
+	// append entries in the log
+	server.Node.stateMachine.append(payload.prevLogIndex + 1, payload.entries...)
+
+	// set the commit index if leader's commit > node's commit
+	if (payload.leaderCommit > server.Node.stateMachine.commitIndex) {
+		server.Node.stateMachine.setCommitIndex(payload.leaderCommit)
+	}
 	return nil
 }
