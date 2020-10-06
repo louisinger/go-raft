@@ -1,5 +1,7 @@
 package internal
 
+import ("log")
+
 // status of node (enum)
 type status int
 const (
@@ -46,6 +48,7 @@ func (n *Node) AddPeer(path string) error {
 		return err
 	} else {
 		n.network = append(n.network, *peerClient)
+		log.Println("Connection established with", path)
 		return nil
 	}
 }

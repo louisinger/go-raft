@@ -9,6 +9,15 @@ import (
 	"github.com/louisinger/go-raft/internal"
 )
 
+func mustHaveXParam(x int, splitted []string) bool {
+	lenArgs := len(splitted[1:])
+	if (lenArgs < x) {
+		log.Println("Error: there is", lenArgs, "arguments but the command needs", x, "arguments.")
+		return false
+	}
+	return true
+}
+
 func main()  {
 	fmt.Println("Welcome inside the goraft cli.")
 	if (len(os.Args) < 2) {
@@ -28,16 +37,23 @@ func main()  {
 		fmt.Print("> ")
 		text, _ := reader.ReadString('\n')
 		text = strings.Replace(text, "\n", "", -1)
-
 		splitted := strings.Split(text, " ")
 
 		switch splitted[0] {
-		case "info":
-			log.Println(client.Info(splitted[1]))
-		case "exit":
-			break
-		default:
-			fmt.Println("Unknow command")
-		}
+			case "info":
+				paramExists := mustHaveXParam(1, splitted)
+				if (paramExists) {
+					log.Println(client.Info(splitted[1]))
+				}
+			case "newpeer":
+				paramExists := mustHaveXParam(1, splitted)
+				if (paramExists) {
+					log.Println(client.NewPeer(splitted[1]))
+				}
+			case "exit":
+				os.Exit(3)
+			default:
+				fmt.Println("Unknow command")
+			}
 	}
 }

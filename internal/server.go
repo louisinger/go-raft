@@ -47,10 +47,10 @@ func (server *Server) NewPeer(path string, reply *bool) error {
 	err := server.Node.AddPeer(path)
 
 	if (err != nil) {
-		*reply = true
+		*reply = false
 		return err
 	} 
 
-	*reply = false
+	*reply = true
 	return nil
 }
