@@ -54,3 +54,23 @@ func (server *Server) NewPeer(path string, reply *bool) error {
 	*reply = true
 	return nil
 }
+
+type AppendEntriesArgs struct {
+	Term int
+	LeaderId string
+	PrevLogIndex int
+	PrevLogTerm int
+	Entries []Command
+	LeaderCommit int
+}
+
+type AppendEntriesReply struct {
+	Term int
+	Success bool
+}
+
+// RPC method AppendEntries
+func (server *Server) AppendEntries(payload AppendEntriesArgs, reply *AppendEntriesReply) error {
+	
+	return nil
+}

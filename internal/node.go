@@ -15,8 +15,7 @@ type Node struct {
 	Port string
 	Status status
 	network Network
-	state map[string]string
-	log []string
+	stateMachine StateMachine
 }
 
 type Network []Client
@@ -38,6 +37,7 @@ func (n Node) RPCserver() *Server {
 	}
 }
 
+// return the path of the node
 func (n Node) Path() string {
 	return n.Domain + ":" + n.Port
 }

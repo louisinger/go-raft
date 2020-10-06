@@ -21,6 +21,7 @@ func NewClient(path string) (*Client, error) {
 	return c, nil
 }
 
+// RPC using to retreive information about the node.
 func (c *Client) Info(payload string) string {
 	var result string
 	if err := c.ClientRPC.Call("Server.Info", payload, &result); err != nil {
@@ -29,6 +30,7 @@ func (c *Client) Info(payload string) string {
 	return result
 }
 
+// RPC using to add a new node into the node's network.
 func (c *Client) NewPeer(payload string) bool {
 	var result bool
 	if err := c.ClientRPC.Call("Server.NewPeer", payload, &result); err != nil {
