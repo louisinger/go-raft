@@ -17,6 +17,7 @@ type Node struct {
 	currentTerm int
 	network Network
 	stateMachine StateMachine
+	votedFor string
 }
 
 type Network []Client

@@ -94,3 +94,43 @@ func (server *Server) AppendEntries(payload AppendEntriesArgs, reply *AppendEntr
 	}
 	return nil
 }
+
+type RequestVoteArgs struct {
+	term int
+	candidateId string
+	lastLogIndex int
+	lastLogTerm int
+}
+
+type RequestVoteReply struct {
+	term int
+	voteGranted bool
+}
+
+
+// RPC method RequestVoteRPC
+func (server *Server) RequestVote(payload RequestVoteArgs, reply *RequestVoteReply) error {
+	reply.term = server.Node.currentTerm 
+
+	if payload.term < server.Node.currentTerm {
+		reply.voteGranted = false
+		return nil
+	}
+	// check the value of votedFor	
+	votedForIsOk := server.Node.votedFor == "" || server.Node.votedFor == payload.candidateId
+	// if the the node has granted a vote before, return false
+	if votedForIsOk == false {
+		reply.voteGranted = false
+		return nil
+	}
+
+	candidateIsUpToDate := (server.Node.stateMachine.getLastLogTerm() <= payload.lastLogTerm) && (len(server.Node.stateMachine.log)-1 <= payload.lastLogIndex)
+
+	if candidateIsUpToDate == false {
+		reply.voteGranted = false
+		return nil
+	}
+
+	reply.voteGranted = true
+	return nil
+}

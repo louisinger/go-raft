@@ -38,3 +38,21 @@ func (c *Client) NewPeer(payload string) bool {
 	}
 	return result
 }
+
+// Append Entries RPC
+func (c *Client) AppendEntries(args AppendEntriesArgs) (int, bool) {
+	var result AppendEntriesReply
+	if err := c.ClientRPC.Call("Server.AppendEntries", args, &result); err != nil {
+		log.Println(err)
+	}
+	return result.term, result.success
+}
+
+// Request Vote RPC
+func (c *Client) RequestVote(args RequestVoteArgs) (int, bool) {
+	var result RequestVoteReply
+	if err := c.ClientRPC.Call("Server.RequestVote", args, &result); err != nil {
+		log.Println(err)
+	}
+	return result.term, result.voteGranted
+}
