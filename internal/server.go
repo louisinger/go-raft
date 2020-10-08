@@ -12,7 +12,7 @@ type Server struct {
 	Node Node
 }
 
-func InitAndServe(server *Server) error {
+func InitAndServe(server *Server, initPeers ...string) error {
 	// set isAlive GET endpoint
 	http.HandleFunc("/", func (res http.ResponseWriter, req *http.Request) {
 		io.WriteString(res, "RPC SERVER LIVE!")
@@ -24,6 +24,7 @@ func InitAndServe(server *Server) error {
 	// log the start event
 	log.Println("Node is running at", server.Node.Path())
 	// listenAndServe function of the http server 
+	go server.Node.AddPeer(initPeers...)
 	go server.Node.StartRaft()
 	log.Fatal(http.ListenAndServe(":" + server.Node.Port, nil))
 	return nil
@@ -57,85 +58,85 @@ func (server *Server) NewPeer(path string, reply *bool) error {
 }
 
 type AppendEntriesArgs struct {
-	term int
-	leaderId string
-	prevLogIndex int
-	prevLogTerm int
-	entries []Command
-	leaderCommit int
+	Term int
+	LeaderId string
+	PrevLogIndex int
+	PrevLogTerm int
+	Entries []Command
+	LeaderCommit int
 }
 
 type AppendEntriesReply struct {
-	term int
-	success bool
+	Term int
+	Success bool
 }
 
 // RPC method AppendEntries
 func (server *Server) AppendEntries(payload AppendEntriesArgs, reply *AppendEntriesReply) error {
-	reply.term = server.Node.currentTerm 
-	if payload.term < server.Node.currentTerm {
-		reply.success = false
+	reply.Term = server.Node.currentTerm 
+	if payload.Term < server.Node.currentTerm {
+		reply.Success = false
 		return nil
 	}
 
-	if len(payload.entries) == 0 {
-		server.Node.heartBeatChannel <- payload.leaderId
+	if len(payload.Entries) == 0 {
+		server.Node.heartBeatChannel <- payload.LeaderId
 	}
 	
-	containLogAtPrevIndex := len(server.Node.stateMachine.log) - 1 > payload.prevLogIndex
-	if containLogAtPrevIndex && payload.prevLogTerm != server.Node.stateMachine.log[payload.prevLogIndex].getTerm() {
-		reply.success = false
+	containLogAtPrevIndex := len(server.Node.stateMachine.log) - 1 > payload.PrevLogIndex
+	if containLogAtPrevIndex && payload.PrevLogTerm != server.Node.stateMachine.log[payload.PrevLogIndex].getTerm() {
+		reply.Success = false
 		return nil
 	}
 	// remove the potential conflicted entries
-	server.Node.stateMachine.removeIfConflicts(payload.entries, payload.prevLogIndex + 1)
+	server.Node.stateMachine.removeIfConflicts(payload.Entries, payload.PrevLogIndex + 1)
 
 	// append entries in the log
-	server.Node.stateMachine.append(payload.prevLogIndex + 1, payload.entries...)
+	server.Node.stateMachine.append(payload.PrevLogIndex + 1, payload.Entries...)
 
 	// set the commit index if leader's commit > node's commit
-	if (payload.leaderCommit > server.Node.stateMachine.commitIndex) {
-		server.Node.stateMachine.setCommitIndex(payload.leaderCommit)
+	if (payload.LeaderCommit > server.Node.stateMachine.commitIndex) {
+		server.Node.stateMachine.setCommitIndex(payload.LeaderCommit)
 	}
 	return nil
 }
 
 type RequestVoteArgs struct {
-	term int
-	candidateId string
-	lastLogIndex int
-	lastLogTerm int
+	Term int
+	CandidateId string
+	LastLogIndex int
+	LastLogTerm int
 }
 
 type RequestVoteReply struct {
-	term int
-	voteGranted bool
+	Term int
+	VoteGranted bool
 }
 
 
 // RPC method RequestVoteRPC
 func (server *Server) RequestVote(payload RequestVoteArgs, reply *RequestVoteReply) error {
-	reply.term = server.Node.currentTerm 
+	reply.Term = server.Node.currentTerm 
 
-	if payload.term < server.Node.currentTerm {
-		reply.voteGranted = false
+	if payload.Term < server.Node.currentTerm {
+		reply.VoteGranted = false
 		return nil
 	}
 	// check the value of votedFor	
-	votedForIsOk := server.Node.votedFor == "" || server.Node.votedFor == payload.candidateId
+	votedForIsOk := server.Node.votedFor == "" || server.Node.votedFor == payload.CandidateId
 	// if the the node has granted a vote before, return false
 	if votedForIsOk == false {
-		reply.voteGranted = false
+		reply.VoteGranted = false
 		return nil
 	}
 
-	candidateIsUpToDate := (server.Node.stateMachine.getLastLogTerm() <= payload.lastLogTerm) && (len(server.Node.stateMachine.log)-1 <= payload.lastLogIndex)
+	candidateIsUpToDate := (server.Node.stateMachine.getLastLogTerm() <= payload.LastLogTerm) && (len(server.Node.stateMachine.log)-1 <= payload.LastLogIndex)
 
 	if candidateIsUpToDate == false {
-		reply.voteGranted = false
+		reply.VoteGranted = false
 		return nil
 	}
 
-	reply.voteGranted = true
+	reply.VoteGranted = true
 	return nil
 }

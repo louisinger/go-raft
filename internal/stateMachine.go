@@ -19,7 +19,11 @@ func NewStateMachine() *StateMachine {
 }
 
 func (sm StateMachine) getLastLogTerm() int {
-	return sm.log[len(sm.log)-1].getTerm()
+	size := len(sm.log)
+	if (size == 0) {
+		return 0
+	}
+	return sm.log[size-1].getTerm()
 }
 
 func (sm *StateMachine) applyUntilCommitIndex() error {

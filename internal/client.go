@@ -7,6 +7,7 @@ import (
 
 type Client struct {
 	ClientRPC *rpc.Client
+	Path string
 }
 
 func NewClient(path string) (*Client, error) {
@@ -15,6 +16,7 @@ func NewClient(path string) (*Client, error) {
 		return nil, err
 	}
 	c := &Client{
+		Path: path,
 		ClientRPC: client,
 	}
 
@@ -45,7 +47,7 @@ func (c *Client) AppendEntries(args AppendEntriesArgs) (int, bool) {
 	if err := c.ClientRPC.Call("Server.AppendEntries", args, &result); err != nil {
 		log.Println(err)
 	}
-	return result.term, result.success
+	return result.Term, result.Success
 }
 
 // Request Vote RPC
@@ -54,6 +56,6 @@ func (c *Client) RequestVote(args RequestVoteArgs) (int, bool) {
 	if err := c.ClientRPC.Call("Server.RequestVote", args, &result); err != nil {
 		log.Println(err)
 	}
-	return result.term, result.voteGranted
+	return result.Term, result.VoteGranted
 }
 
