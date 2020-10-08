@@ -24,6 +24,7 @@ func InitAndServe(server *Server) error {
 	// log the start event
 	log.Println("Node is running at", server.Node.Path())
 	// listenAndServe function of the http server 
+	go server.Node.StartRaft()
 	log.Fatal(http.ListenAndServe(":" + server.Node.Port, nil))
 	return nil
 }
@@ -72,13 +73,17 @@ type AppendEntriesReply struct {
 // RPC method AppendEntries
 func (server *Server) AppendEntries(payload AppendEntriesArgs, reply *AppendEntriesReply) error {
 	reply.term = server.Node.currentTerm 
-	if (payload.term < server.Node.currentTerm) {
+	if payload.term < server.Node.currentTerm {
 		reply.success = false
 		return nil
 	}
+
+	if len(payload.entries) == 0 {
+		server.Node.heartBeatChannel <- payload.leaderId
+	}
 	
 	containLogAtPrevIndex := len(server.Node.stateMachine.log) - 1 > payload.prevLogIndex
-	if (containLogAtPrevIndex && payload.prevLogTerm != server.Node.stateMachine.log[payload.prevLogIndex].getTerm()) {
+	if containLogAtPrevIndex && payload.prevLogTerm != server.Node.stateMachine.log[payload.prevLogIndex].getTerm() {
 		reply.success = false
 		return nil
 	}

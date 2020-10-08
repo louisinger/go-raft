@@ -56,3 +56,4 @@ func (c *Client) RequestVote(args RequestVoteArgs) (int, bool) {
 	}
 	return result.term, result.voteGranted
 }
+
