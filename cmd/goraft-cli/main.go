@@ -6,6 +6,7 @@ import (
 	"os"
 	"log"
 	"strings"
+	"encoding/json"
 	"github.com/louisinger/go-raft/internal"
 )
 
@@ -19,6 +20,7 @@ func mustHaveXParam(x int, splitted []string) bool {
 }
 
 func main()  {
+
 	fmt.Println("Welcome inside the goraft cli.")
 	if (len(os.Args) < 2) {
 		log.Fatal("You must specify the server path (domain:port)")
@@ -42,13 +44,23 @@ func main()  {
 		switch splitted[0] {
 			case "info":
 				paramExists := mustHaveXParam(1, splitted)
-				if (paramExists) {
+				if paramExists {
 					log.Println(client.Info(splitted[1]))
 				}
 			case "newpeer":
 				paramExists := mustHaveXParam(1, splitted)
-				if (paramExists) {
+				if paramExists {
 					log.Println(client.NewPeer(splitted[1]))
+				}
+			case "put":
+				if mustHaveXParam(2, splitted) {
+					data := make(map[string]interface{}) 
+					data["value"] = splitted[2]
+					json, _ := json.Marshal(data)
+					entries := []internal.PutEntriesArgs{
+						internal.PutEntriesArgs{Key: splitted[1], JsonStr: string(json)},
+					}
+					log.Println(client.Put(entries))
 				}
 			case "exit":
 				os.Exit(3)

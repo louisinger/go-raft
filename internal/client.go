@@ -10,16 +10,16 @@ type Client struct {
 	Path string
 }
 
-func NewClient(path string) (*Client, error) {
+func NewClient(path string) (Client, error) {
 	client, err :=	rpc.DialHTTP("tcp", path)
-	if err != nil {
-		return nil, err
-	}
-	c := &Client{
+	c := Client{
 		Path: path,
 		ClientRPC: client,
 	}
-
+	if err != nil {
+		log.Println("dialing:", err)
+		return c, err
+	}
 	return c, nil
 }
 
@@ -57,5 +57,15 @@ func (c *Client) RequestVote(args RequestVoteArgs) (int, bool) {
 		log.Println(err)
 	}
 	return result.Term, result.VoteGranted
+}
+
+// PutEntries RPC
+func (c *Client) Put(payload []PutEntriesArgs) (bool, error) {
+	var result bool
+	if err := c.ClientRPC.Call("Server.PutEntries", payload, &result); err != nil {
+		log.Println(err)
+		return result, err
+	}
+	return result, nil
 }
 

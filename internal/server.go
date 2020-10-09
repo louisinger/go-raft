@@ -1,34 +1,15 @@
 package internal
 
 import ( 
-	"net/http" 
-	"net/rpc"
-	"io"
-	"log"
 	"fmt"
+	"log"
+	"encoding/json"
 )
 
 type Server struct {
 	Node Node
 }
 
-func InitAndServe(server *Server, initPeers ...string) error {
-	// set isAlive GET endpoint
-	http.HandleFunc("/", func (res http.ResponseWriter, req *http.Request) {
-		io.WriteString(res, "RPC SERVER LIVE!")
-	})
-
-	// set up the RPC server
-	rpc.Register(server)
-	rpc.HandleHTTP()
-	// log the start event
-	log.Println("Node is running at", server.Node.Path())
-	// listenAndServe function of the http server 
-	go server.Node.AddPeer(initPeers...)
-	go server.Node.StartRaft()
-	log.Fatal(http.ListenAndServe(":" + server.Node.Port, nil))
-	return nil
-}
 
 // RPC method info
 func (server *Server) Info(payload string, reply *string) error {
@@ -37,6 +18,9 @@ func (server *Server) Info(payload string, reply *string) error {
 		*reply = "network"
 	case "domain":
 		*reply = server.Node.Domain
+	case "state":
+		j, _ := json.Marshal(server.Node.stateMachine.state)
+		*reply = string(j)
 	default:
 		return fmt.Errorf(payload + " is not a submethod of info.")
 	}
@@ -81,6 +65,8 @@ func (server *Server) AppendEntries(payload AppendEntriesArgs, reply *AppendEntr
 
 	if len(payload.Entries) == 0 {
 		server.Node.heartBeatChannel <- payload.LeaderId
+		reply.Success = true
+		return nil
 	}
 	
 	containLogAtPrevIndex := len(server.Node.stateMachine.log) - 1 > payload.PrevLogIndex
@@ -92,7 +78,7 @@ func (server *Server) AppendEntries(payload AppendEntriesArgs, reply *AppendEntr
 	server.Node.stateMachine.removeIfConflicts(payload.Entries, payload.PrevLogIndex + 1)
 
 	// append entries in the log
-	server.Node.stateMachine.append(payload.PrevLogIndex + 1, payload.Entries...)
+	server.Node.stateMachine.append(payload.PrevLogIndex, payload.Entries...)
 
 	// set the commit index if leader's commit > node's commit
 	if (payload.LeaderCommit > server.Node.stateMachine.commitIndex) {
@@ -116,6 +102,7 @@ type RequestVoteReply struct {
 
 // RPC method RequestVoteRPC
 func (server *Server) RequestVote(payload RequestVoteArgs, reply *RequestVoteReply) error {
+	log.Println("request vote received from", payload.CandidateId)
 	reply.Term = server.Node.currentTerm 
 
 	if payload.Term < server.Node.currentTerm {
@@ -138,5 +125,56 @@ func (server *Server) RequestVote(payload RequestVoteArgs, reply *RequestVoteRep
 	}
 
 	reply.VoteGranted = true
+	return nil
+}
+
+type PutEntriesArgs struct {
+	Key string
+	JsonStr string
+}
+
+// PutEntries - use for clients to send new entries to the leader
+func (server *Server) PutEntries(payload []PutEntriesArgs, reply *bool) error {
+	log.Println("Put commands received.")
+	switch server.Node.status {
+		case candidate, follower:
+			log.Println("Put commands redirected to leader.")
+			// redirect to leader
+			for _, client := range server.Node.network {
+				if client.Path == server.Node.leaderId {
+					success, e := client.Put(payload)
+					*reply = success 
+					return e
+				}
+			}
+		case leader:
+			termLeader := server.Node.currentTerm
+			var cmds []Command
+			for _, put := range payload {
+				// deserialize and create Command
+				var valueJson Json
+				if err := json.Unmarshal([]byte(put.JsonStr), &valueJson); err != nil {
+					*reply = false
+					return err
+				}
+				cmd := Put{
+					Entry: Entry{Term: termLeader},
+					key: put.Key,
+					value: valueJson,
+				}
+				cmds = append(cmds, cmd)
+			}
+
+			server.Node.stateMachine.log = append(server.Node.stateMachine.log, cmds...) 
+			server.Node.stateMachine.commitIndex += len(cmds)
+			if err := server.Node.stateMachine.applyUntilCommitIndex(); err != nil {
+				log.Println(err)
+				*reply = false
+				return err
+			}
+			*reply = true
+			return nil
+	}
+	*reply = false
 	return nil
 }

@@ -27,6 +27,7 @@ type Node struct {
 	currentTerm int
 	stateMachine StateMachine
 	votedFor string
+	leaderId string
 	heartBeatChannel chan string
 	newStatusChannel chan Status
 }
@@ -59,9 +60,9 @@ func tryToAddPeerWorker(paths <-chan string, clients chan<- Client) {
 			// log.Println(err)
 			time.Sleep(time.Millisecond * 2000)
 		} else {
-			clients <- *c
+			clients <- c
 			log.Println("Connection established with", p)
-			break
+			return
 		}
 		i++
 	}
@@ -120,7 +121,8 @@ func (n *Node) listenHeartBeat()  {
 			}
 		}()
 		receivedFrom := <- n.heartBeatChannel
-		log.Println("Heartbeat received by", receivedFrom)
+		n.leaderId = receivedFrom
+		log.Println("Heartbeat received from", receivedFrom)
 		timer.Stop() 
 		if (n.status == candidate) {
 			log.Println("A leader has been elected, the node becomes a follower")
@@ -137,6 +139,7 @@ func (n *Node) StartRaft() error {
 		switch (n.status) {
 			case leader:
 				go n.sendHeartBeat()
+				go n.replicate()
 			case candidate:
 				// timerElection := time.NewTimer(electionTimer)
 				time.Sleep(time.Duration(rand.Intn(2000)) * time.Millisecond)
@@ -151,8 +154,6 @@ func (n *Node) startElection() {
 	nbOfVotes := 0
 	n.votedFor = n.Path()
 	chanSize := len(n.network)
-
-	
 
 	if chanSize == 0 {
 		n.changeStatus(leader)
@@ -178,8 +179,6 @@ func (n *Node) startElection() {
 			go n.startElection()
 		}()
 
-		
-
 		for granted := range chanVotes {
 			if granted == true {
 				nbOfVotes++
@@ -202,8 +201,44 @@ func (n *Node) requestVoteWorker(cli <-chan Client, granted chan<- bool) {
 			LastLogTerm: n.stateMachine.getLastLogTerm(),
 		})
 
+		if ok == true {
+			log.Println("Vote granted +1")
+		}
+
 		granted<-ok
 	}
+}
+
+func (n *Node) replicate() error {
+	if n.status != leader {
+		return fmt.Errorf("The node is not the leader")
+	}
+
+	// init nextIndex array
+	nextIndex := make(map[string]int)
+	for _, c := range n.network {
+		nextIndex[c.Path] = 0
+	}
+
+	for n.status == leader {
+		<-n.stateMachine.replicate
+		// send AppendEntries empty to all client
+		for _, client := range n.network {
+			if nextIndex[client.Path] < n.stateMachine.lastApplied {
+				log.Println("Replicate to", client.Path)
+				go client.AppendEntries(AppendEntriesArgs{
+					Term: n.currentTerm,
+					LeaderId: n.Path(),
+					PrevLogIndex: len(n.stateMachine.log) - 1,
+					PrevLogTerm: n.stateMachine.getLastLogTerm(),
+					Entries: n.stateMachine.log[nextIndex[client.Path]:n.stateMachine.lastApplied],
+					LeaderCommit: n.stateMachine.commitIndex,
+				})
+				nextIndex[client.Path] = n.stateMachine.lastApplied
+			}
+		}
+	}
+	return nil
 }
 
 // send empty appendEntries RPC to all nodes
@@ -217,7 +252,6 @@ func (n *Node) sendHeartBeat() error {
 			log.Println("Send heartbeat to", len(n.network), "nodes")
 			// send AppendEntries empty to all client
 			for _, client := range n.network {
-				fmt.Println(client)
 				go client.AppendEntries(AppendEntriesArgs{
 					Term: n.currentTerm,
 					LeaderId: n.Path(),

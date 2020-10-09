@@ -9,12 +9,12 @@ type Json map[string]interface{}
 type Store map[string][]byte
 
 type Command interface {
-	apply(state Store) error
+	apply(state *Store) error
 	getTerm() int
 }
 
 type Entry struct {
-	term int
+	Term int
 }
 
 // The command put inserts (or replaces) a value at a given key
@@ -31,11 +31,11 @@ type Delete struct {
 }
 
 func (e Entry) getTerm() int {
-	return e.term
+	return e.Term
 }
 
 // apply a list of commands (= a log)
-func (state Store) Apply(cmd Command) error {
+func (state *Store) Apply(cmd Command) error {
 	if err := cmd.apply(state); err != nil {
 		return err
 	}
@@ -43,8 +43,8 @@ func (state Store) Apply(cmd Command) error {
 }
 
 // method using to get the value of a specific key
-func (state Store) Get(key string) (Json, error) {
-	bytes, ok := state[key]
+func (state *Store) Get(key string) (Json, error) {
+	bytes, ok := (*state)[key]
 	if (ok == false) {
 		return nil, errors.New("Can't get the value for the key: " + key)
 	}
@@ -61,20 +61,20 @@ func (state Store) Get(key string) (Json, error) {
 
 // implements apply function for PUT and DELETE
 
-func (put Put) apply(state Store) error {
+func (put Put) apply(state *Store) error {
 	bytes, err := json.Marshal(put.value)
 	if err != nil {
 		return err
 	}
-	state[put.key] = bytes
+	(*state)[put.key] = bytes
 	return nil
 }
 
-func (del Delete) apply(state Store) error {
-	if _, ok := state[del.key]; ok == false {
+func (del Delete) apply(state *Store) error {
+	if _, ok := (*state)[del.key]; ok == false {
 		return errors.New("The key: " + del.key + " does not exist.")
 	}
-	delete(state, del.key)
+	delete(*state, del.key)
 	return nil
 }
 

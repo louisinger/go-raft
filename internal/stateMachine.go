@@ -1,20 +1,25 @@
 package internal
 
-import ( "math" )
+import ( 
+	"math" 
+	"log"
+ )
 
 type StateMachine struct {
 	state Store
 	commitIndex int
 	lastApplied int
 	log []Command
+	replicate chan bool
 }
 
 func NewStateMachine() *StateMachine {
 	return &StateMachine{
-		state: map[string][]byte{},
+		state: make(map[string][]byte),
 		commitIndex: 0,
 		lastApplied: 0,
 		log: []Command{},
+		replicate: make(chan bool),
 	}
 }
 
@@ -29,13 +34,16 @@ func (sm StateMachine) getLastLogTerm() int {
 func (sm *StateMachine) applyUntilCommitIndex() error {
 	nbToApply := sm.commitIndex - sm.lastApplied
 	if nbToApply <= 0 {
+		sm.replicate <- true
 		return nil
 	} 
-	err := sm.state.Apply(sm.log[sm.lastApplied + 1])
+	toApply := sm.log[sm.lastApplied]
+	sm.lastApplied++
+	log.Println("Apply command to state machine:", toApply)
+	err := sm.state.Apply(toApply)
 	if err != nil {
 		return err
 	}
-	sm.lastApplied++
 	return sm.applyUntilCommitIndex()
 }
 
@@ -50,8 +58,13 @@ func (sm *StateMachine) append(startAt int, cmds ...Command) {
 }
 
 func (sm *StateMachine) removeIfConflicts(cmds []Command, startIndex int) bool {
+	lastIndex := len(sm.log) - 1
+	if lastIndex < startIndex {
+		return false
+	}
+
 	toCheck := sm.log[startIndex:]
-	if (len(toCheck) == 0) {
+	if len(toCheck) == 0 {
 		return false
 	}
 
