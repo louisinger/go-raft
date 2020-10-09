@@ -1,1 +1,2 @@
-build/*
+build/goraft-cli/*
+build/goraft-daemon/*
