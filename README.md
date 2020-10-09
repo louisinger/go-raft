@@ -70,9 +70,9 @@ Install go: https://golang.org/doc/install
 
 ## Meta
 
-Your Name – [@TheSingerLouis](https://twitter.com/dbader_org) – louis@vulpem.com
+Louis SINGER – [@TheSingerLouis](https://twitter.com/dbader_org) – louis@vulpem.com
 
-Distributed under the MIT license. See `LICENSE` for more information.
+Distributed under the UNLICENSE license. See `LICENSE` for more information.
 
 ## Contributing
 
