@@ -7,9 +7,9 @@ import (
 	"math/rand"
 )
 
-const heartBeatTime = time.Millisecond * 1000
-const heartBeatTimout = time.Millisecond * 3000
-const electionTimer = time.Millisecond * 3000
+const heartBeatTime = time.Millisecond * 5000
+const heartBeatTimout = time.Millisecond * 6000
+const electionTimer = time.Millisecond * 10000
 
 // status of node (enum)
 type Status string
@@ -45,6 +45,7 @@ func NewNode(dom string, port string) *Node {
 		votedFor: "",
 		heartBeatChannel: make(chan string),
 		newStatusChannel: make(chan Status),
+		network: make([]Client, 0),
 	}
 }
 
@@ -60,7 +61,7 @@ func tryToAddPeerWorker(paths <-chan string, clients chan<- Client) {
 			// log.Println(err)
 			time.Sleep(time.Millisecond * 2000)
 		} else {
-			clients <- c
+			clients <- c  
 			log.Println("Connection established with", p)
 			return
 		}
@@ -88,7 +89,6 @@ func (n *Node) AddPeer(peers ...string) error {
 		n.network = append(n.network, client)
 	}
 	close(clients)
-	fmt.Println("network", n.network)
 	return nil
 }
 
@@ -252,7 +252,7 @@ func (n *Node) sendHeartBeat() error {
 			log.Println("Send heartbeat to", len(n.network), "nodes")
 			// send AppendEntries empty to all client
 			for _, client := range n.network {
-				go client.AppendEntries(AppendEntriesArgs{
+				client.AppendEntries(AppendEntriesArgs{
 					Term: n.currentTerm,
 					LeaderId: n.Path(),
 					PrevLogIndex: len(n.stateMachine.log) - 1,
